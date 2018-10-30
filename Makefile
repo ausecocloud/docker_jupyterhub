@@ -31,5 +31,8 @@ run:
 	# npm install -g configurable-http-proxy
 	docker run --rm -it -v $(PWD):/code -p 8081:8081 -p 8010:8010 -p 8001:8001 -e CONFIGPROXY_AUTH_TOKEN=test -e JUPYTERHUB_CRYPT_KEY=12345678901234567890123456789012 --entrypoint bash $(PREFIX)/$(IMAGE):$(TAG)
 
+test:
+	docker run --rm -it -v $(PWD)/files/jupyterhub-config.yaml:/etc/jupyterhub/jupyterhub-config.yaml -p 8081:8081 -p 8010:8010 -p 8001:8001 -e CONFIGPROXY_AUTH_TOKEN=test -e JUPYTERHUB_CRYPT_KEY=12345678901234567890123456789012 $(PREFIX)/$(IMAGE):$(TAG)
+
 config:
 	docker run --rm -it -v $(PWD):/code $(PREFIX)/$(IMAGE):$(TAG) --generate-config --config /code/jupyterhub_config_gen.py

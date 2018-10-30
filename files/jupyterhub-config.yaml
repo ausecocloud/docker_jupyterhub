@@ -6,7 +6,6 @@ JupyterHub:
   allow_named_servers: false
 
   authenticator_class: "keycloakauthenticator.KeyCloakAuthenticator"
-  base_url: "/"
 
   cleanup_proxy: true
   cleanup_servers: true
@@ -15,14 +14,15 @@ JupyterHub:
   db_url: "sqlite:///jupyterhub.sqlite"
 
   # if hub_ip is '0.0.0.0' then try to auto detect
-  # otherwise use hub_ip
-  hub_connect_url: "http://jupyterhub:8081"
+  # otherwise use hub_ip (proxies and spawners will use that)
+  hub_connect_url: "http://127.0.0.1:8081"
 
   # hub address bind
   hub_bind_url: "http://0.0.0.0:8081"
 
   # This is the address on which the proxy will bind. (to proxy requests)
-  bind_url: "http://0.0.0.0:8010"
+  # it basically is the external url used by clients to conenct to the proxy
+  bind_url: "http://127.0.0.1:8010"
 
   logo_file: "/srv/jupyterhub/ecocloud_logo.svg"
 
@@ -38,39 +38,41 @@ JupyterHub:
         - "--timeout=3600"
     - name: "ecocloud"
       admin: false
-      url: "http://0.0.0.0:8888"
+      url: "http://127.0.0.1:10100"
       command:
         - "python3"
         - "/usr/local/bin/ecocloud_hub_service.py"
+        - "--listen-url=http://0.0.0.0:10100"
 
   # shutdown hub when too many spawn failures... set this only if
   # hub runs in an auto restarting environment
   consecutive_failure_limit: 5
 
   #spawner_class: "dockerspawner.DockerSpawner"
-  #spawner_class: "formkubespawner.FormKubeSpawner"
   spawner_class: "kubespawner.KubeSpawner"
 
   statsd_host: ""
-  statsd_port: 8125
+  statsd_port: 9125
   statsd_prefix: "jupyterhub"
 
   tornado_settings:
     headers:
       Access-Control-Allow-Origin: "*"
+      # we may want to have PATH here as well... it's used to e.g. modify a users name
+      Access-Control-Allow-Methods: "GET, HEAD, POST, DELETE"
 
 Proxy:
   should_start: false
 
 ConfigurableHTTPProxy:
   should_start: false
-  api_url: "http://jupyterproxy:8001"
+  # The url the hub uses to talk to proxy api
+  api_url: "http://127.0.0.1:8001"
 
 LocalProcessSpawner:
   ip: "0.0.0.0"
 
 Authenticator:
-  admin_users: !!set {}
   # JUPYTERHUB_CRYPTO_KEY environment variable must contain one
   #  (or more, separated by ;) 32B encryption keys. These can be either base64 or
   #  hex-encoded.
@@ -78,7 +80,7 @@ Authenticator:
   auto_login: false
 
 GenericOAuthenticator:
-  login_service: EcoCloud
+  login_service: OpenID Conenct
   scope:
     - openid
     - email
@@ -90,7 +92,9 @@ GenericOAuthenticator:
 
 KeyCloakAuthenticator:
   oidc_config_url: "https://auth.ecocloud.org.au/auth/realms/test/.well-known/openid-configuration"
-  admin_role: "jupyter_admin"
+  admin_role: "admin"
+  required_roles:
+    - "user"
 
 # TODO: check if this sets defaults everywhere?
 Spawner:
@@ -114,52 +118,31 @@ Spawner:
 
 
 NamespacedResourceReflector:
-  # network read timeout 6 minutes
+  # network read timeout 5 minutes
   request_timeout: 300
   # watch timeout 3 minutes
   timeout_seconds: 150
 
 KubeSpawner:
   namespace: jupyter-user
-  singleuser_image_pull_policy: IfNotPresent
-  singleuser_image_pull_secrets: hub-bccvl-org-au
-  singleuser_node_selector:
+  image_pull_policy: IfNotPresent
+  image_pull_secrets: hub-bccvl-org-au
+  node_selector:
     node.role/jupyter-user: "true"
-  singleuser_uid: 1000
-  singleuser_fs_gid: 100
-  singleuser_extra_pod_config:
-    tolerations:
-      - key: "dedicated"
-        value: "jupyter-user"
-        effect: "NoSchedule"
+  uid: 1000
+  fs_gid: 100
+
+  tolerations:
+    - key: "dedicated"
+      value: "jupyter-user"
+      effect: "NoSchedule"
   volumes:
     - name: workspace
       emptyDir: {}
   volume_mounts:
     - name: workspace
       mountPath: /home/jovyan
-  profile_form_template: |
-    <style>
-    /* The profile description should not be bold, even though it is inside the <label> tag */
-    #kubespawner-profiles-list label p {
-        font-weight: normal;
-    }
-    </style>
-    <div class='form-group' id='kubespawner-profiles-list'>
-        {% for profile in profile_list %}
-        <label for='profile-item-{{ loop.index0 }}' class='form-control input-group'>
-            <div class='col-md-1'>
-                <input type='radio' name='profile' id='profile-item-{{ loop.index0 }}' value='{{ loop.index0 }}' {% if profile.default %}checked{% endif %} />
-            </div>
-            <div class='col-md-11'>
-                <strong>{{ profile.display_name }}</strong>
-                {% if profile.description %}
-                <p>{{ profile.description }}</p>
-                {% endif %}
-            </div>
-        </label>
-        {% endfor %}
-    </div>
+
   profile_list:
     - display_name: "SciPy Notebook"
       description: A Jupyter Notebook server with Python kernel and various Python packages pre-installed.
