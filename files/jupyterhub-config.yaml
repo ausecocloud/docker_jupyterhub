@@ -1,0 +1,173 @@
+# can jupyter just load
+#       /srv/jupyterhub_config.json ???
+
+JupyterHub:
+  admin_access: false
+  allow_named_servers: false
+
+  authenticator_class: "keycloakauthenticator.KeyCloakAuthenticator"
+  base_url: "/"
+
+  cleanup_proxy: true
+  cleanup_servers: true
+
+  db_kwargs: {}
+  db_url: "sqlite:///jupyterhub.sqlite"
+
+  # if hub_ip is '0.0.0.0' then try to auto detect
+  # otherwise use hub_ip
+  hub_connect_url: "http://jupyterhub:8081"
+
+  # hub address bind
+  hub_bind_url: "http://0.0.0.0:8081"
+
+  # This is the address on which the proxy will bind. (to proxy requests)
+  bind_url: "http://0.0.0.0:8010"
+
+  logo_file: "/srv/jupyterhub/ecocloud_logo.svg"
+
+  ## Redirect user to server (if running), instead of control panel.
+  redirect_to_server: false
+
+  services:
+    - name: "cull-idle"
+      admin: true
+      command:
+        - "python3"
+        - "/usr/local/bin/cull_idle_servers.py"
+        - "--timeout=3600"
+    - name: "ecocloud"
+      admin: false
+      url: "http://0.0.0.0:8888"
+      command:
+        - "python3"
+        - "/usr/local/bin/ecocloud_hub_service.py"
+
+  # shutdown hub when too many spawn failures... set this only if
+  # hub runs in an auto restarting environment
+  consecutive_failure_limit: 5
+
+  #spawner_class: "dockerspawner.DockerSpawner"
+  #spawner_class: "formkubespawner.FormKubeSpawner"
+  spawner_class: "kubespawner.KubeSpawner"
+
+  statsd_host: ""
+  statsd_port: 8125
+  statsd_prefix: "jupyterhub"
+
+  tornado_settings:
+    headers:
+      Access-Control-Allow-Origin: "*"
+
+Proxy:
+  should_start: false
+
+ConfigurableHTTPProxy:
+  should_start: false
+  api_url: "http://jupyterproxy:8001"
+
+LocalProcessSpawner:
+  ip: "0.0.0.0"
+
+Authenticator:
+  admin_users: !!set {}
+  # JUPYTERHUB_CRYPTO_KEY environment variable must contain one
+  #  (or more, separated by ;) 32B encryption keys. These can be either base64 or
+  #  hex-encoded.
+  enable_auth_state: true
+  auto_login: false
+
+GenericOAuthenticator:
+  login_service: EcoCloud
+  scope:
+    - openid
+    - email
+    # - profile
+    # scope determines permissions, and claims to be included in id_token
+  # client_id: OAUTH_CLIENT_ID
+  # client_secret: OAUTH_CLIENT_SECRET
+  # validate_server_cert: OAUTH_TLS_VERIFY != 0
+
+KeyCloakAuthenticator:
+  oidc_config_url: "https://auth.ecocloud.org.au/auth/realms/test/.well-known/openid-configuration"
+  admin_role: "jupyter_admin"
+
+# TODO: check if this sets defaults everywhere?
+Spawner:
+  mem_limit: null
+  mem_guarantee: 2G
+  cpu_limit: null
+  cpu_guarantee: 1
+  # start at specific url when redirecting to notebook server
+  # e.g. notebook_dir = / and default_url = /tree/home/{username}
+  default_url: "/lab"
+  notebook_dir: /home/jovyan
+  http_timeout: 120
+  start_timeout: 300
+  # args:
+  #   - '--NotebookApp.allow_origin=*'
+
+  # shutdown hub when too many spawn failures... set this only if
+  # hub runs in an auto restarting environment
+  consecutive_failure_limit: 5
+
+
+
+NamespacedResourceReflector:
+  # network read timeout 6 minutes
+  request_timeout: 300
+  # watch timeout 3 minutes
+  timeout_seconds: 150
+
+KubeSpawner:
+  namespace: jupyter-user
+  singleuser_image_pull_policy: IfNotPresent
+  singleuser_image_pull_secrets: hub-bccvl-org-au
+  singleuser_node_selector:
+    node.role/jupyter-user: "true"
+  singleuser_uid: 1000
+  singleuser_fs_gid: 100
+  singleuser_extra_pod_config:
+    tolerations:
+      - key: "dedicated"
+        value: "jupyter-user"
+        effect: "NoSchedule"
+  volumes:
+    - name: workspace
+      emptyDir: {}
+  volume_mounts:
+    - name: workspace
+      mountPath: /home/jovyan
+  profile_form_template: |
+    <style>
+    /* The profile description should not be bold, even though it is inside the <label> tag */
+    #kubespawner-profiles-list label p {
+        font-weight: normal;
+    }
+    </style>
+    <div class='form-group' id='kubespawner-profiles-list'>
+        {% for profile in profile_list %}
+        <label for='profile-item-{{ loop.index0 }}' class='form-control input-group'>
+            <div class='col-md-1'>
+                <input type='radio' name='profile' id='profile-item-{{ loop.index0 }}' value='{{ loop.index0 }}' {% if profile.default %}checked{% endif %} />
+            </div>
+            <div class='col-md-11'>
+                <strong>{{ profile.display_name }}</strong>
+                {% if profile.description %}
+                <p>{{ profile.description }}</p>
+                {% endif %}
+            </div>
+        </label>
+        {% endfor %}
+    </div>
+  profile_list:
+    - display_name: "SciPy Notebook"
+      description: A Jupyter Notebook server with Python kernel and various Python packages pre-installed.
+      default: true
+      kubespawner_override:
+        singleuser_image_spec: hub.bccvl.org.au/jupyter/scipy-notebook:latest
+    - display_name: "RStudio Notebook"
+      description: A Jupyter Notebook server with R kernel and various R packages including RStudio pre-installed.
+      default: false
+      kubespawner_override:
+        singleuser_image_spec: hub.bccvl.org.au/jupyter/r-notebook:latest
