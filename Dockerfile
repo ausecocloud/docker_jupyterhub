@@ -49,9 +49,10 @@ COPY files/jupyterhub_config.py /srv/jupyterhub/jupyterhub_config.py
 COPY files/ecocloud_logo.svg /srv/jupyterhub/ecocloud_logo.svg
 COPY files/jupyterhub-config.yaml /etc/jupyterhub/jupyterhub-config.yaml
 COPY files/ecocloud_hub_service.py /usr/local/bin/ecocloud_hub_service.py
+COPY files/entrypoint.sh /entrypoint.sh
 
 WORKDIR /srv/jupyterhub/
 
 USER jupyter
 
-ENTRYPOINT ["jupyterhub"]
+ENTRYPOINT ["/entrypoint.sh"]

@@ -19,6 +19,11 @@ IMAGE = jupyterhub
 TAG ?= 0.9.4
 BUILD_OPTS ?=
 
+IMAGE_ARG = $(PREFIX)/$(IMAGE):$(TAG)
+PORT_ARGS = -p 8081:8081 -p 8010:8010 -p 8001:8001
+ENV_ARGS = -e CONFIGPROXY_AUTH_TOKEN=test -e JUPYTERHUB_CRYPT_KEY=12345678901234567890123456789012
+
+
 build:
 	docker build $(BUILD_OPTS) -t $(PREFIX)/$(IMAGE):$(TAG) .
 
@@ -29,10 +34,10 @@ run:
 	# apt-get install npm vim
 	# vim /etc/hosts
 	# npm install -g configurable-http-proxy
-	docker run --rm -it -v $(PWD):/code -p 8081:8081 -p 8010:8010 -p 8001:8001 -e CONFIGPROXY_AUTH_TOKEN=test -e JUPYTERHUB_CRYPT_KEY=12345678901234567890123456789012 --entrypoint bash $(PREFIX)/$(IMAGE):$(TAG)
+	docker run --rm -it -v $(PWD):/code $(PORT_ARGS) $(ENV_ARGS) $(IMAGE_ARG) bash
 
 test:
-	docker run --rm -it -v $(PWD)/files/jupyterhub-config.yaml:/etc/jupyterhub/jupyterhub-config.yaml -p 8081:8081 -p 8010:8010 -p 8001:8001 -e CONFIGPROXY_AUTH_TOKEN=test -e JUPYTERHUB_CRYPT_KEY=12345678901234567890123456789012 $(PREFIX)/$(IMAGE):$(TAG)
+	docker run --rm -it $(PORT_ARGS) $(ENV_ARGS) $(IMAGE_ARG)
 
 config:
-	docker run --rm -it -v $(PWD):/code $(PREFIX)/$(IMAGE):$(TAG) --generate-config --config /code/jupyterhub_config_gen.py
+	docker run --rm -it -v $(PWD):/code $(IMAGE_ARG) --generate-config --config /code/jupyterhub_config_gen.py
