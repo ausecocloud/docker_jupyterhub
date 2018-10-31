@@ -40,7 +40,7 @@ node ('docker') {
                     img.push()
                 }
 
-                slackSend color: 'good', message: "New Image ${img.id}\n${env.JOB_URL}"
+                slackSend color: 'good', message: "New Image ${img.id}\n${env.JOB_URL}", tokenCredentialId: 'Slack_ecocloud', teamDomain: 'ecocloudgroup'
             }
 
         }
