@@ -36,7 +36,7 @@ RUN pip3 install --no-cache-dir \
          psycopg2-binary \
          jupyterhub-kubespawner==0.9.0 \
          statsd \
-         https://github.com/ausecocloud/keycloakauthenticator/archive/32e416c02eba8d7d3b39126865c8bde90afdaee0.zip \
+         https://github.com/ausecocloud/keycloakauthenticator/archive/0.8.1.zip \
  &&  curl -o /usr/local/bin/cull_idle_servers.py https://raw.githubusercontent.com/jupyterhub/jupyterhub/0.9.4/examples/cull-idle/cull_idle_servers.py
 
 RUN mkdir -p /srv/jupyterhub/ \
