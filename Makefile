@@ -16,7 +16,7 @@
 
 PREFIX = hub.bccvl.org.au/jupyter
 IMAGE = jupyterhub
-TAG ?= 0.9.4
+TAG ?= 0.9.4-5
 BUILD_OPTS ?=
 
 IMAGE_ARG = $(PREFIX)/$(IMAGE):$(TAG)
