@@ -28,9 +28,11 @@ class Keycloak(object):
             baseurl=baseurl, realm=realm
         )
         self.user_url = '{adminurl}/users/{userid}'.format(adminurl=adminurl, userid='{userid}')
+        self.client_url = '{adminurl}/clients?clientId={clientid}'.format(adminurl=adminurl, clientid='{clientid}')
 
         self.client_id = client_id
         self.client_secret = client_secret
+        self.client_uuid = None
 
         client = BackendApplicationClient(client_id)
         self.session = OAuth2Session(
@@ -44,6 +46,7 @@ class Keycloak(object):
             token_updater=lambda tok: None
         )
         self._fetch_token()
+        self._fetch_client_uuid()
 
     def _fetch_token(self):
         # get initital token
@@ -53,40 +56,18 @@ class Keycloak(object):
             scope=self.session.scope
         )
 
-    def _get_userinfo(self, userid):
-        user_url = self.user_url.format(userid=userid)
+    def _fetch_client_uuid(self):
+        client_url = self.client_url.format(clientid=self.client_id)
+        res = self.session.get(client_url)
+        res.raise_for_status()
+        self.client_uuid = res.json()[0]['id']
+
+    def get_client_role_mappings(self, userid):
+        # 1. get client uuid
+        user_url = self.user_url.format(userid=userid) + '/role-mappings/clients/' + self.client_uuid + '/composite'
         res = self.session.get(user_url)
         res.raise_for_status()
         return res.json()
-
-    def get_role_mappings(self, userid):
-        user_url = self.user_url.format(userid=userid) + '/role-mappings'
-        res = self.session.get(user_url)
-        res.raise_for_status()
-        return res.json()
-
-    def get_email_for_user(self, userid):
-        tries = 2
-        while tries:
-            try:
-                userinfo = self._get_userinfo(userid)
-                app_log.debug('Userinfo for %s: %s', userid, userinfo)
-                if not userinfo.get('email', '').strip():
-                    raise Exception('No email configured for user %s', userid)
-                return Address(
-                    display_name=userinfo.get('display_name', ''),
-                    addr_spec=userinfo['email']
-                )
-            except InvalidGrantError as e:
-                # log this error
-                app_log.error("Invalid Grant Error %s", e)
-                self._fetch_token()
-                tries -= 1
-            except TokenExpiredError as e:
-                # our refreshtoken is gone :(
-                app_log.error("Token Expired Error %s", e)
-                self._fetch_token()
-                tries -= 1
 
 
 class OptionsHandler(HubAuthenticated, RequestHandler):
@@ -129,9 +110,10 @@ class OptionsHandler(HubAuthenticated, RequestHandler):
         client_roles = []
         try:
             # app_log.info('Retrieve roles for user %s', userid)
-            role_mappings = self.keycloak.get_role_mappings(userid)
-            client_roles = [role['name'] for role in
-                            role_mappings['clientMappings'][self.keycloak.client_id]['mappings']]
+            client_roles = [
+                role['name'] for role in
+                self.keycloak.get_client_role_mappings(userid)
+            ]
             # app_log.info('Roles: %s', client_roles)
         except Exception as e:
             app_log.error('Failed to retrieve user roles from Keycloak: %s', e)
