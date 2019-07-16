@@ -34,6 +34,7 @@ RUN pip3 install --no-cache-dir \
          jupyterhub==0.9.4 \
          oauthenticator==0.8.0 \
          psycopg2-binary \
+         kubernetes==8.0.1 \
          jupyterhub-kubespawner==0.10.1 \
          statsd \
          https://github.com/ausecocloud/keycloakauthenticator/archive/0.8.1.zip \
